@@ -13,6 +13,7 @@
 int flexs = 32;
 int badan = 0;
 String durasi = "";
+int count = 0;
 boolean avgstatus = true;
 boolean waitstatus = false;
 unsigned long UpdateInsStamp = 0;
@@ -33,7 +34,7 @@ const int echoPin = 18;
 #define SOUND_SPEED 0.034
 long duration;
 float distanceCm;
-String BASE_URL = "http://192.168.222.251:8000";
+String BASE_URL = "http://192.168.59.251:8000";
 String data;
 String readFromEEPROM(int addrOffset);
 void writeToEEPROM(int addrOffset, const String &strToWrite);
@@ -254,6 +255,9 @@ void loop() {
 
   if (waitstatus == true && millis() > UpdateInsStamp + WaitingInsStamp) {
     Serial.println("cari average lagi");
+    String strcount;
+    count += 1;
+    strcount = String(count);
     avgstatus = true;
     instanceTimestamp = millis();
     waitstatus = false;
@@ -261,6 +265,8 @@ void loop() {
     JmlLux = 0;
     TotalCm = 0;
     JmlCm = 0;
+    String dataToSend = "{\"count\" : \"" + strcount + "\"}";
+    SendDataServer("/api/v1/session/restupdate", dataToSend);
   }
 
   display.clearDisplay();
