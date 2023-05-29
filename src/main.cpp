@@ -5,6 +5,7 @@
 #include <BH1750.h>
 #include <EEPROM.h>
 #include <HTTPClient.h>
+#include <PubSubClient.h>
 #include <RTClib.h>
 #include <SPI.h>
 #include <WiFiManager.h>
@@ -37,7 +38,75 @@ float distanceCm;
 String BASE_URL = "http://192.168.59.251:8000";
 String data;
 String readFromEEPROM(int addrOffset);
-void writeToEEPROM(int addrOffset, const String &strToWrite);
+void writeToEEPROM(int addrOffset, const String& strToWrite);
+
+WiFiClient mqttClient;
+PubSubClient subClient(mqttClient);
+boolean message = false;
+
+const char* mqttServer = "192.168.59.251";
+const char* mqttTopicStart = "body/monitor/start/";
+const char* mqttTopicStop = "body/monitor/stop/";
+const int mqttPort = 1883;
+const char* mqttUser = "";
+const char* mqttPassword = "";
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.println("Message arrived in topic: " + String(topic));
+
+  // Serial.print("Message: ");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+  // Serial.println("-----------------------");
+  String top1 = mqttTopicStart + data;
+  const char* top1Char = top1.c_str();
+
+  String top2 = mqttTopicStop + data;
+  const char* top2Char = top2.c_str();
+  if (String(topic) == top1) {
+    Serial.println("Sesi mulai");
+    message = true;
+    count = 0;
+    avgstatus = true;
+    waitstatus = false;
+    UpdateInsStamp = 0;
+    WaitingInsStamp = 0;
+    messageTimestamp = 0;
+    instanceTimestamp = 0;
+  }
+  if (String(topic) == top2) {
+    message = false;
+    Serial.println("Sesi selesai");
+  }
+}
+
+void connectMqtt() {
+  subClient.setServer(mqttServer, mqttPort);
+  subClient.setCallback(callback);
+  while (!subClient.connected()) {
+    Serial.println("Connecting to PubSubClient MQTT...");
+
+    if (subClient.connect("body/monitoring/ESP32", mqttUser, mqttPassword)) {
+      Serial.println("Connected to PubSubClient MQTT broker");
+
+      String top1 = mqttTopicStart + data;
+      const char* top1Char = top1.c_str();
+
+      String top2 = mqttTopicStop + data;
+      const char* top2Char = top2.c_str();
+
+      // Subscribe to the desired topic
+      subClient.subscribe(top1Char);
+      subClient.subscribe(top2Char);
+    } else {
+      Serial.print("Failed to connect to MQTT broker, state: ");
+      Serial.println(subClient.state());
+      delay(2000);
+    }
+  }
+}
 
 int SendDataServer(String endpoint, String payload) {
   String url = BASE_URL + endpoint;
@@ -92,7 +161,7 @@ String readFromEEPROM(int addrOffset) {
   return String(data);
 }
 
-void writeToEEPROM(int addrOffset, const String &strToWrite) {
+void writeToEEPROM(int addrOffset, const String& strToWrite) {
   int len = strToWrite.length();
   Serial.println("Store new data to EEPROM");
   EEPROM.write(addrOffset, len);
@@ -163,13 +232,13 @@ void setup() {
   }
   // DeviceId("/api/v1/device/generate-id", "{}");
   Serial.print("Status EEPROM: ");
-  float TestAddress;
-  EEPROM.get(0, TestAddress);
+  // float TestAddress;
+  // EEPROM.get(0, TestAddress);
+  data = readFromEEPROM(0);
 
-  if (TestAddress == NAN) {
+  if (data == "") {
     Serial.print("EEPROM Kosong");
     DeviceId("/api/v1/device/generate-id", "{}");
-
   }
 
   else {
@@ -179,6 +248,7 @@ void setup() {
     Serial.println(data);
   }
   instanceTimestamp = millis();
+  connectMqtt();
 }
 
 void loop() {
@@ -202,7 +272,8 @@ void loop() {
     JmlCm += 1;
   }
 
-  if (avgstatus == true && millis() > instanceTimestamp + instanceMaxTime) {
+  if (avgstatus == true && message == true &&
+      millis() > instanceTimestamp + instanceMaxTime) {
     AvgLux = TotalLux / JmlLux;
     AvgCm = TotalCm / JmlCm;
     if (AvgLux >= 90 && AvgLux <= 110) {
@@ -253,7 +324,8 @@ void loop() {
     Serial.printf("waktu istirahat = %s\n", durasi);
   }
 
-  if (waitstatus == true && millis() > UpdateInsStamp + WaitingInsStamp) {
+  if (waitstatus == true && message == true &&
+      millis() > UpdateInsStamp + WaitingInsStamp) {
     Serial.println("cari average lagi");
     String strcount;
     count += 1;
@@ -376,10 +448,9 @@ void loop() {
     Serial.println("Error");
     postur = "Error";
   }
-
   display.display();
   uint64_t skrg = millis();
-  if (skrg - messageTimestamp > 1000) {
+  if (skrg - messageTimestamp > 1000 && message == true) {
     messageTimestamp = millis();
     String strpostur = String(postur);
     String strlux = String(lux);
@@ -391,4 +462,8 @@ void loop() {
                         bacaeprom + "\"}";
     SendDataServer("/api/v1/session/stream", dataToSend);
   }
+  if (!subClient.connected()) {
+    connectMqtt();
+  }
+  subClient.loop();
 }
