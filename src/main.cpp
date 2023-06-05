@@ -12,12 +12,17 @@
 #include <Wire.h>
 
 int flexs = 32;
+int buzzerPin = 12;
 int badan = 0;
 String durasi = "";
 int count = 0;
 boolean avgstatus = true;
 boolean waitstatus = false;
+boolean buzzerstatus = false;
+boolean buzzerpermission = true;
 unsigned long UpdateInsStamp = 0;
+unsigned long BuzzerTimeStamp = 0;
+unsigned long BuzzerMaxTime = 20000;
 unsigned long WaitingInsStamp = 0;
 unsigned long messageTimestamp = 0;
 unsigned long instanceTimestamp = 0;
@@ -35,7 +40,7 @@ const int echoPin = 18;
 #define SOUND_SPEED 0.034
 long duration;
 float distanceCm;
-String BASE_URL = "http://192.168.59.251:8000";
+String BASE_URL = "http://192.168.159.251:8000";
 String data;
 String readFromEEPROM(int addrOffset);
 void writeToEEPROM(int addrOffset, const String& strToWrite);
@@ -44,7 +49,7 @@ WiFiClient mqttClient;
 PubSubClient subClient(mqttClient);
 boolean message = false;
 
-const char* mqttServer = "192.168.59.251";
+const char* mqttServer = "192.168.159.251";
 const char* mqttTopicStart = "body/monitor/start/";
 const char* mqttTopicStop = "body/monitor/stop/";
 const int mqttPort = 1883;
@@ -171,6 +176,12 @@ void writeToEEPROM(int addrOffset, const String& strToWrite) {
   }
 }
 
+void BuzzerMethod() {
+  digitalWrite(buzzerPin, HIGH);
+  delay(300);
+  digitalWrite(buzzerPin, LOW);
+}
+
 BH1750 lightMeter;
 
 RTC_DS3231 rtc;
@@ -189,6 +200,8 @@ void setup() {
   Serial.begin(9600);
   Serial.println("READY");
   pinMode(flexs, INPUT);
+  pinMode(buzzerPin, OUTPUT);
+  digitalWrite(buzzerPin, LOW);
   Wire.begin();
   lightMeter.begin();
   pinMode(trigPin, OUTPUT);  // Sets the trigPin as an Output
@@ -374,6 +387,7 @@ void loop() {
       display.println("Jarak Anda Dengan ");
       display.setCursor(0, 30);
       display.println("Layar Terlalu Jauh");
+      buzzerstatus = true;
     } else {
       display.clearDisplay();
       display.setTextSize(1);
@@ -381,6 +395,7 @@ void loop() {
       display.println("Jarak Anda Dengan ");
       display.setCursor(0, 30);
       display.println("Layar Terlalu Dekat");
+      buzzerstatus = true;
     }
   } else if (lux >= 120 && lux <= 150) {
     if (distanceCm >= 51 && distanceCm <= 75) {
@@ -426,6 +441,7 @@ void loop() {
     display.println("Pencahayaan Laptop");
     display.setCursor(0, 30);
     display.println("Terlalu Terang");
+    buzzerstatus = true;
 
   } else {
     display.clearDisplay();
@@ -434,6 +450,16 @@ void loop() {
     display.println("Pencahayaan Laptop");
     display.setCursor(0, 30);
     display.println("Terlalu Redup");
+    buzzerstatus = true;
+  }
+  if (buzzerstatus == true && buzzerpermission == true) {
+    BuzzerMethod();
+    BuzzerTimeStamp = millis();
+    buzzerstatus = false;
+    buzzerpermission = false;
+  }
+  if (millis() - BuzzerTimeStamp > BuzzerMaxTime) {
+    buzzerpermission = true;
   }
   if (badan < 720) {
     Serial.println("Postur Bungkuk");
