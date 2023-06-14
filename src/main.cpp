@@ -40,7 +40,7 @@ const int echoPin = 18;
 #define SOUND_SPEED 0.034
 long duration;
 float distanceCm;
-String BASE_URL = "http://192.168.159.251:8000";
+String BASE_URL = "http://192.168.213.251:8000";
 String data;
 String readFromEEPROM(int addrOffset);
 void writeToEEPROM(int addrOffset, const String& strToWrite);
@@ -49,7 +49,7 @@ WiFiClient mqttClient;
 PubSubClient subClient(mqttClient);
 boolean message = false;
 
-const char* mqttServer = "192.168.159.251";
+const char* mqttServer = "192.168.213.251";
 const char* mqttTopicStart = "body/monitor/start/";
 const char* mqttTopicStop = "body/monitor/stop/";
 const int mqttPort = 1883;
@@ -268,6 +268,7 @@ void loop() {
   // put your main code here, to run repeatedly:
   DateTime now = rtc.now();
   badan = analogRead(flexs);
+  Serial.println(badan);
   String postur = "";
   String bacaeprom = readFromEEPROM(0);
   float lux = lightMeter.readLightLevel();
@@ -350,6 +351,13 @@ void loop() {
     JmlLux = 0;
     TotalCm = 0;
     JmlCm = 0;
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setCursor(0, 20);
+    display.println("Waktunya Anda");
+    display.setCursor(0, 30);
+    display.println("Beristirahat !");
+    buzzerstatus = true;
     String dataToSend = "{\"count\" : \"" + strcount + "\"}";
     SendDataServer("/api/v1/session/restupdate", dataToSend);
   }
@@ -359,7 +367,7 @@ void loop() {
   display.setTextSize(2);
   display.setCursor(0, 0);
   display.println(bacaeprom);
-  if (lux >= 90 && lux <= 110) {
+  if (lux >= 5 && lux <= 36) {
     if (distanceCm >= 51 && distanceCm <= 75) {
       display.clearDisplay();
       display.setTextSize(2);
@@ -397,7 +405,7 @@ void loop() {
       display.println("Layar Terlalu Dekat");
       buzzerstatus = true;
     }
-  } else if (lux >= 120 && lux <= 150) {
+  } else if (lux >= 37  && lux <= 75) {
     if (distanceCm >= 51 && distanceCm <= 75) {
       display.clearDisplay();
       display.setTextSize(2);
@@ -434,7 +442,7 @@ void loop() {
       display.println("Layar Terlalu Dekat");
     }
 
-  } else if (lux > 150) {
+  } else if (lux > 75) {
     display.clearDisplay();
     display.setTextSize(1);
     display.setCursor(0, 20);
@@ -461,13 +469,13 @@ void loop() {
   if (millis() - BuzzerTimeStamp > BuzzerMaxTime) {
     buzzerpermission = true;
   }
-  if (badan < 720) {
+  if (badan < 640) {
     Serial.println("Postur Bungkuk");
     postur = "Bungkuk";
-  } else if (badan > 800) {
+  } else if (badan > 940) {
     Serial.println("Postur Tegang");
     postur = "Tegang";
-  } else if (badan >= 720 && badan <= 800) {
+  } else if (badan >= 640 && badan <= 940) {
     Serial.println("Optimal");
     postur = "Optimal";
   } else {
