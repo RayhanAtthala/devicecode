@@ -12,8 +12,10 @@
 #include <Wire.h>
 
 int flexs = 32;
+int flexs2 = 33;
 int buzzerPin = 12;
 int badan = 0;
+int badan2 = 0;
 String durasi = "";
 int count = 0;
 boolean avgstatus = true;
@@ -200,6 +202,7 @@ void setup() {
   Serial.begin(9600);
   Serial.println("READY");
   pinMode(flexs, INPUT);
+  pinMode(flexs2, INPUT);
   pinMode(buzzerPin, OUTPUT);
   digitalWrite(buzzerPin, LOW);
   Wire.begin();
@@ -268,7 +271,9 @@ void loop() {
   // put your main code here, to run repeatedly:
   DateTime now = rtc.now();
   badan = analogRead(flexs);
+  badan2 = analogRead(flexs2);
   Serial.println(badan);
+  Serial.println(badan2);
   String postur = "";
   String bacaeprom = readFromEEPROM(0);
   float lux = lightMeter.readLightLevel();
@@ -405,7 +410,7 @@ void loop() {
       display.println("Layar Terlalu Dekat");
       buzzerstatus = true;
     }
-  } else if (lux >= 37  && lux <= 75) {
+  } else if (lux >= 37 && lux <= 75) {
     if (distanceCm >= 51 && distanceCm <= 75) {
       display.clearDisplay();
       display.setTextSize(2);
@@ -469,13 +474,13 @@ void loop() {
   if (millis() - BuzzerTimeStamp > BuzzerMaxTime) {
     buzzerpermission = true;
   }
-  if (badan < 640) {
+  if (badan < 640 || badan2 < 640) {
     Serial.println("Postur Bungkuk");
     postur = "Bungkuk";
-  } else if (badan > 940) {
+  } else if (badan > 940 || badan2 > 940) {
     Serial.println("Postur Tegang");
     postur = "Tegang";
-  } else if (badan >= 640 && badan <= 940) {
+  } else if (badan >= 640 && badan <= 940 || badan2 >= 640 && badan2 <= 940) {
     Serial.println("Optimal");
     postur = "Optimal";
   } else {
